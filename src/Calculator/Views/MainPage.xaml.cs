@@ -157,7 +157,7 @@ namespace CalculatorApp
 
         protected override void OnNavigatedTo(NavigationEventArgs e)
         {
-            var initialMode = ViewMode.Standard;
+            var initialMode = ViewMode.Scientific; // Default to Scientific mode
             var localSettings = ApplicationData.Current.LocalSettings;
             if (localSettings.Values.ContainsKey(nameof(ApplicationViewModel.Mode)))
             {

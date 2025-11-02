@@ -281,8 +281,21 @@ NavCategoryGroup::NavCategoryGroup(const NavCategoryGroupInitializer& groupIniti
 
     for (const NavCategoryInitializer& categoryInitializer : s_categoryManifest)
     {
+        // Only include Scientific mode for Calculator group, skip all other modes
         if (categoryInitializer.groupType == groupInitializer.type)
         {
+            // Only show Scientific calculator mode, hide all others
+            if (groupInitializer.type == CategoryGroupType::Calculator && categoryInitializer.viewMode != ViewMode::Scientific)
+            {
+                continue;
+            }
+            
+            // Skip all converter modes entirely
+            if (groupInitializer.type == CategoryGroupType::Converter)
+            {
+                continue;
+            }
+            
             String ^ nameResourceKey = StringReference(categoryInitializer.nameResourceKey);
             String ^ categoryName = resProvider->GetResourceString(nameResourceKey + "Text");
             String ^ categoryAutomationName = LocalizationStringUtil::GetLocalizedString(navCategoryItemAutomationNameFormat, categoryName, m_Name);
@@ -309,8 +322,9 @@ void NavCategoryStates::SetCurrentUser(Platform::String^ userId)
 IVector<NavCategoryGroup ^> ^ NavCategoryStates::CreateMenuOptions()
 {
     auto menuOptions = ref new Vector<NavCategoryGroup ^>();
+    // Only add Calculator group (which now only contains Scientific mode)
     menuOptions->Append(CreateCalculatorCategoryGroup());
-    menuOptions->Append(CreateConverterCategoryGroup());
+    // Do not add Converter group - we only want Scientific calculator
     return menuOptions;
 }
 
