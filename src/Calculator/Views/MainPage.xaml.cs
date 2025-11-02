@@ -734,9 +734,17 @@ namespace CalculatorApp
         private void OnQuickLaunchHotkeyInvoked(Windows.UI.Xaml.Input.KeyboardAccelerator sender, Windows.UI.Xaml.Input.KeyboardAcceleratorInvokedEventArgs args)
         {
             // Note: UWP platform limitation - cannot implement true window hide/minimize to system tray
-            // This keyboard shortcut is registered but has limited functionality in UWP
+            // Best we can do is ensure window is activated (brought to foreground)
             // See SIMPLIFIED_CALCULATOR.md for details on platform limitations
-            TraceLogger.GetInstance().LogInfo("Quick launch hotkey invoked - limited functionality due to UWP constraints");
+            try
+            {
+                Window.Current.Activate();
+                TraceLogger.GetInstance().LogInfo("Quick launch hotkey invoked - window activated");
+            }
+            catch (Exception ex)
+            {
+                TraceLogger.GetInstance().LogError(ViewMode.None, nameof(OnQuickLaunchHotkeyInvoked), ex.Message);
+            }
             args.Handled = true;
         }
 
