@@ -48,11 +48,10 @@ namespace CalculatorApp
 
             KeyboardShortcutManager.Initialize();
             
-            // Add global hotkey handler for Ctrl+Shift+C (minimize/restore window)
+            // Add keyboard shortcut handler for Ctrl+Shift+C
+            // Note: UWP apps cannot intercept window close or implement system tray functionality
+            // See SIMPLIFIED_CALCULATOR.md for details on platform limitations
             RegisterQuickLaunchHotkey();
-            
-            // Handle window close event to minimize to background instead of exit
-            RegisterWindowCloseHandler();
 
             Application.Current.Suspending += App_Suspending;
             Model.PropertyChanged += OnAppPropertyChanged;
@@ -173,18 +172,14 @@ namespace CalculatorApp
             if (e.Parameter == null)
             {
                 Model.Initialize(initialMode);
-                _ = RestoreAlwaysOnTopStateAsync();
-                return;
             }
-
-            if (e.Parameter is string legacyArgs)
+            else if (e.Parameter is string legacyArgs)
             {
                 if (legacyArgs.Length > 0)
                 {
                     initialMode = (ViewMode)Convert.ToInt32(legacyArgs);
                 }
                 Model.Initialize(initialMode);
-                _ = RestoreAlwaysOnTopStateAsync();
             }
             else if (e.Parameter is SnapshotLaunchArguments snapshotArgs)
             {
@@ -200,12 +195,14 @@ namespace CalculatorApp
                         async () => await ShowSnapshotLaunchErrorAsync());
                     TraceLogger.GetInstance().LogRecallError("OnNavigatedTo:Found errors.");
                 }
-                _ = RestoreAlwaysOnTopStateAsync();
             }
             else
             {
                 Environment.FailFast("cd75d5af-0f47-4cc2-910c-ed792ed16fe6");
             }
+            
+            // Restore Always on Top state after initialization
+            _ = RestoreAlwaysOnTopStateAsync();
         }
 
         private void InitializeNavViewCategoriesSource()
@@ -541,9 +538,8 @@ namespace CalculatorApp
 
         private void App_Suspending(object sender, Windows.ApplicationModel.SuspendingEventArgs e)
         {
-            ApplicationDataContainer localSettings = ApplicationData.Current.LocalSettings;
-            
             // Save Always on Top state
+            var localSettings = ApplicationData.Current.LocalSettings;
             localSettings.Values["IsAlwaysOnTop"] = Model.IsAlwaysOnTop;
             
             if (Model.IsAlwaysOnTop)
@@ -742,15 +738,6 @@ namespace CalculatorApp
             // See SIMPLIFIED_CALCULATOR.md for details on platform limitations
             TraceLogger.GetInstance().LogInfo("Quick launch hotkey invoked - limited functionality due to UWP constraints");
             args.Handled = true;
-        }
-
-        private void RegisterWindowCloseHandler()
-        {
-            // Note: In UWP apps, we cannot intercept the window close event to minimize to tray
-            // instead of closing. This is a platform limitation.
-            // The app will close normally when the user closes the window.
-            // For true "minimize to tray" experience, Desktop Bridge or Win32 app would be needed.
-            // This method is retained for documentation purposes.
         }
 
         private Calculator m_calculator;
