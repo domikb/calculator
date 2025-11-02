@@ -173,7 +173,7 @@ namespace CalculatorApp
             if (e.Parameter == null)
             {
                 Model.Initialize(initialMode);
-                RestoreAlwaysOnTopState();
+                _ = RestoreAlwaysOnTopStateAsync();
                 return;
             }
 
@@ -184,7 +184,7 @@ namespace CalculatorApp
                     initialMode = (ViewMode)Convert.ToInt32(legacyArgs);
                 }
                 Model.Initialize(initialMode);
-                RestoreAlwaysOnTopState();
+                _ = RestoreAlwaysOnTopStateAsync();
             }
             else if (e.Parameter is SnapshotLaunchArguments snapshotArgs)
             {
@@ -200,7 +200,7 @@ namespace CalculatorApp
                         async () => await ShowSnapshotLaunchErrorAsync());
                     TraceLogger.GetInstance().LogRecallError("OnNavigatedTo:Found errors.");
                 }
-                RestoreAlwaysOnTopState();
+                _ = RestoreAlwaysOnTopStateAsync();
             }
             else
             {
@@ -689,7 +689,7 @@ namespace CalculatorApp
             await dialog.ShowAsync();
         }
 
-        private async void RestoreAlwaysOnTopState()
+        private async Task RestoreAlwaysOnTopStateAsync()
         {
             var localSettings = ApplicationData.Current.LocalSettings;
             
@@ -699,8 +699,19 @@ namespace CalculatorApp
                 var wasAlwaysOnTop = (bool)localSettings.Values["IsAlwaysOnTop"];
                 if (wasAlwaysOnTop && !Model.IsAlwaysOnTop)
                 {
+                    // Use saved window dimensions if available, otherwise use current dimensions
+                    double width = ActualWidth;
+                    double height = ActualHeight;
+                    
+                    if (localSettings.Values.TryGetValue(ApplicationViewModel.WidthLocalSettingsKey, out var savedWidth) &&
+                        localSettings.Values.TryGetValue(ApplicationViewModel.HeightLocalSettingsKey, out var savedHeight))
+                    {
+                        width = (double)savedWidth;
+                        height = (double)savedHeight;
+                    }
+                    
                     // Restore the Always on Top mode
-                    await Model.ToggleAlwaysOnTop(ActualWidth, ActualHeight);
+                    await Model.ToggleAlwaysOnTop(width, height);
                 }
             }
         }
@@ -726,51 +737,20 @@ namespace CalculatorApp
 
         private void OnQuickLaunchHotkeyInvoked(Windows.UI.Xaml.Input.KeyboardAccelerator sender, Windows.UI.Xaml.Input.KeyboardAcceleratorInvokedEventArgs args)
         {
-            // Toggle window visibility (minimize/restore)
-            ToggleWindowVisibility();
+            // Note: UWP platform limitation - cannot implement true window hide/minimize to system tray
+            // This keyboard shortcut is registered but has limited functionality in UWP
+            // See SIMPLIFIED_CALCULATOR.md for details on platform limitations
+            TraceLogger.GetInstance().LogInfo("Quick launch hotkey invoked - limited functionality due to UWP constraints");
             args.Handled = true;
-        }
-
-        private void ToggleWindowVisibility()
-        {
-            var appView = ApplicationView.GetForCurrentView();
-            
-            // Try to minimize the window
-            // Note: UWP apps don't have true minimize to system tray, but we can reduce the window
-            if (Window.Current.Visible)
-            {
-                // For UWP, we can't truly minimize to tray, but we can make the window very small
-                // and move it off-screen or use CompactOverlay mode
-                _ = Dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
-                {
-                    try
-                    {
-                        // Try to hide the app by minimizing it
-                        // In UWP, we need to use ApplicationView to control window state
-                        var view = ApplicationView.GetForCurrentView();
-                        
-                        // Store current state for restoration
-                        var localSettings = ApplicationData.Current.LocalSettings;
-                        localSettings.Values["WindowMinimized"] = true;
-                        
-                        // Note: There's no direct minimize API for UWP
-                        // The best we can do is document this limitation
-                        TraceLogger.GetInstance().LogWarning("Window minimize requested - UWP limitation: cannot minimize to system tray");
-                    }
-                    catch (Exception ex)
-                    {
-                        TraceLogger.GetInstance().LogError(ViewMode.None, nameof(ToggleWindowVisibility), ex.Message);
-                    }
-                });
-            }
         }
 
         private void RegisterWindowCloseHandler()
         {
-            // Note: In UWP apps, we cannot truly intercept the window close event to minimize to tray
+            // Note: In UWP apps, we cannot intercept the window close event to minimize to tray
             // instead of closing. This is a platform limitation.
             // The app will close normally when the user closes the window.
-            // For a true "minimize to tray" experience, a Desktop Bridge or Win32 app would be needed.
+            // For true "minimize to tray" experience, Desktop Bridge or Win32 app would be needed.
+            // This method is retained for documentation purposes.
         }
 
         private Calculator m_calculator;
