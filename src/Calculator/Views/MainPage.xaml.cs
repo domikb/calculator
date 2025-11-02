@@ -167,6 +167,7 @@ namespace CalculatorApp
             if (e.Parameter == null)
             {
                 Model.Initialize(initialMode);
+                RestoreAlwaysOnTopState();
                 return;
             }
 
@@ -177,6 +178,7 @@ namespace CalculatorApp
                     initialMode = (ViewMode)Convert.ToInt32(legacyArgs);
                 }
                 Model.Initialize(initialMode);
+                RestoreAlwaysOnTopState();
             }
             else if (e.Parameter is SnapshotLaunchArguments snapshotArgs)
             {
@@ -192,6 +194,7 @@ namespace CalculatorApp
                         async () => await ShowSnapshotLaunchErrorAsync());
                     TraceLogger.GetInstance().LogRecallError("OnNavigatedTo:Found errors.");
                 }
+                RestoreAlwaysOnTopState();
             }
             else
             {
@@ -532,9 +535,13 @@ namespace CalculatorApp
 
         private void App_Suspending(object sender, Windows.ApplicationModel.SuspendingEventArgs e)
         {
+            ApplicationDataContainer localSettings = ApplicationData.Current.LocalSettings;
+            
+            // Save Always on Top state
+            localSettings.Values["IsAlwaysOnTop"] = Model.IsAlwaysOnTop;
+            
             if (Model.IsAlwaysOnTop)
             {
-                ApplicationDataContainer localSettings = ApplicationData.Current.LocalSettings;
                 localSettings.Values[ApplicationViewModel.WidthLocalSettingsKey] = ActualWidth;
                 localSettings.Values[ApplicationViewModel.HeightLocalSettingsKey] = ActualHeight;
             }
@@ -674,6 +681,22 @@ namespace CalculatorApp
                 DefaultButton = wuxc.ContentDialogButton.Close
             };
             await dialog.ShowAsync();
+        }
+
+        private async void RestoreAlwaysOnTopState()
+        {
+            var localSettings = ApplicationData.Current.LocalSettings;
+            
+            // Restore Always on Top state if it was saved
+            if (localSettings.Values.ContainsKey("IsAlwaysOnTop"))
+            {
+                var wasAlwaysOnTop = (bool)localSettings.Values["IsAlwaysOnTop"];
+                if (wasAlwaysOnTop && !Model.IsAlwaysOnTop)
+                {
+                    // Restore the Always on Top mode
+                    await Model.ToggleAlwaysOnTop(ActualWidth, ActualHeight);
+                }
+            }
         }
 
         private Calculator m_calculator;
