@@ -242,7 +242,7 @@ namespace CalculatorApp.ManagedViewModels
         {
             if (!NavCategoryStates.IsValidViewMode(mode) || !NavCategoryStates.IsViewModeEnabled(mode))
             {
-                mode = ViewMode.Standard;
+                mode = ViewMode.Scientific; // Default to Scientific mode instead of Standard
             }
             try
             {
@@ -363,11 +363,11 @@ namespace CalculatorApp.ManagedViewModels
         private bool TryRecoverFromNavigationModeFailure()
         {
             // Here we are simply trying to recover from being unable to navigate to a mode.
-            // Try falling back to standard mode and if there are *any* exceptions, we should
+            // Try falling back to scientific mode and if there are *any* exceptions, we should
             // fail because something is seriously wrong.
             try
             {
-                Mode = ViewMode.Standard;
+                Mode = ViewMode.Scientific; // Fall back to Scientific mode instead of Standard
                 return true;
             }
             catch

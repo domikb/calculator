@@ -47,6 +47,11 @@ namespace CalculatorApp
             InitializeComponent();
 
             KeyboardShortcutManager.Initialize();
+            
+            // Add keyboard shortcut handler for Ctrl+Shift+C
+            // Note: UWP apps cannot intercept window close or implement system tray functionality
+            // See SIMPLIFIED_CALCULATOR.md for details on platform limitations
+            RegisterQuickLaunchHotkey();
 
             Application.Current.Suspending += App_Suspending;
             Model.PropertyChanged += OnAppPropertyChanged;
@@ -157,7 +162,7 @@ namespace CalculatorApp
 
         protected override void OnNavigatedTo(NavigationEventArgs e)
         {
-            var initialMode = ViewMode.Standard;
+            var initialMode = ViewMode.Scientific; // Default to Scientific mode
             var localSettings = ApplicationData.Current.LocalSettings;
             if (localSettings.Values.ContainsKey(nameof(ApplicationViewModel.Mode)))
             {
@@ -167,10 +172,8 @@ namespace CalculatorApp
             if (e.Parameter == null)
             {
                 Model.Initialize(initialMode);
-                return;
             }
-
-            if (e.Parameter is string legacyArgs)
+            else if (e.Parameter is string legacyArgs)
             {
                 if (legacyArgs.Length > 0)
                 {
@@ -197,6 +200,9 @@ namespace CalculatorApp
             {
                 Environment.FailFast("cd75d5af-0f47-4cc2-910c-ed792ed16fe6");
             }
+            
+            // Restore Always on Top state after initialization
+            _ = RestoreAlwaysOnTopStateAsync();
         }
 
         private void InitializeNavViewCategoriesSource()
@@ -532,9 +538,12 @@ namespace CalculatorApp
 
         private void App_Suspending(object sender, Windows.ApplicationModel.SuspendingEventArgs e)
         {
+            // Save Always on Top state
+            var localSettings = ApplicationData.Current.LocalSettings;
+            localSettings.Values["IsAlwaysOnTop"] = Model.IsAlwaysOnTop;
+            
             if (Model.IsAlwaysOnTop)
             {
-                ApplicationDataContainer localSettings = ApplicationData.Current.LocalSettings;
                 localSettings.Values[ApplicationViewModel.WidthLocalSettingsKey] = ActualWidth;
                 localSettings.Values[ApplicationViewModel.HeightLocalSettingsKey] = ActualHeight;
             }
@@ -674,6 +683,69 @@ namespace CalculatorApp
                 DefaultButton = wuxc.ContentDialogButton.Close
             };
             await dialog.ShowAsync();
+        }
+
+        private async Task RestoreAlwaysOnTopStateAsync()
+        {
+            var localSettings = ApplicationData.Current.LocalSettings;
+            
+            // Restore Always on Top state if it was saved
+            if (localSettings.Values.ContainsKey("IsAlwaysOnTop"))
+            {
+                var wasAlwaysOnTop = (bool)localSettings.Values["IsAlwaysOnTop"];
+                if (wasAlwaysOnTop && !Model.IsAlwaysOnTop)
+                {
+                    // Use saved window dimensions if available, otherwise use current dimensions
+                    double width = ActualWidth;
+                    double height = ActualHeight;
+                    
+                    if (localSettings.Values.TryGetValue(ApplicationViewModel.WidthLocalSettingsKey, out var savedWidth) &&
+                        localSettings.Values.TryGetValue(ApplicationViewModel.HeightLocalSettingsKey, out var savedHeight))
+                    {
+                        width = (double)savedWidth;
+                        height = (double)savedHeight;
+                    }
+                    
+                    // Restore the Always on Top mode
+                    await Model.ToggleAlwaysOnTop(width, height);
+                }
+            }
+        }
+
+        private void RegisterQuickLaunchHotkey()
+        {
+            // Register Ctrl+Shift+C keyboard shortcut for quick launch (minimize/restore)
+            try
+            {
+                var accelerator = new Windows.UI.Xaml.Input.KeyboardAccelerator
+                {
+                    Key = Windows.System.VirtualKey.C,
+                    Modifiers = Windows.System.VirtualKeyModifiers.Control | Windows.System.VirtualKeyModifiers.Shift
+                };
+                accelerator.Invoked += OnQuickLaunchHotkeyInvoked;
+                this.KeyboardAccelerators.Add(accelerator);
+            }
+            catch (Exception ex)
+            {
+                TraceLogger.GetInstance().LogError(ViewMode.None, nameof(RegisterQuickLaunchHotkey), ex.Message);
+            }
+        }
+
+        private void OnQuickLaunchHotkeyInvoked(Windows.UI.Xaml.Input.KeyboardAccelerator sender, Windows.UI.Xaml.Input.KeyboardAcceleratorInvokedEventArgs args)
+        {
+            // Note: UWP platform limitation - cannot implement true window hide/minimize to system tray
+            // Best we can do is ensure window is activated (brought to foreground)
+            // See SIMPLIFIED_CALCULATOR.md for details on platform limitations
+            try
+            {
+                Window.Current.Activate();
+                TraceLogger.GetInstance().LogInfo("Quick launch hotkey invoked - window activated");
+            }
+            catch (Exception ex)
+            {
+                TraceLogger.GetInstance().LogError(ViewMode.None, nameof(OnQuickLaunchHotkeyInvoked), ex.Message);
+            }
+            args.Handled = true;
         }
 
         private Calculator m_calculator;
